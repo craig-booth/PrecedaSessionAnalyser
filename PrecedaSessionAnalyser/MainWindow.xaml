@@ -1,0 +1,99 @@
+﻿<Window x:Class="PrecedaSessionAnalyser.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:PrecedaSessionAnalyser"
+        xmlns:chart="clr-namespace:PrecedaSessionAnalyser.Charts"
+        xmlns:lvcharts="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="666.842" Width="695.211">
+
+    <Window.Resources>
+        <local:MainWindowViewModel x:Key="ViewModel"/>
+
+        <DataTemplate DataType="{x:Type chart:CartesianChart}">
+
+            <lvcharts:CartesianChart Series="{Binding ChartSeriesCollection}" Margin="10" LegendLocation="Right" >
+                <lvcharts:CartesianChart.AxisX>
+                    <lvcharts:Axis Title="Time" Labels="{Binding Labels}" Foreground="Black" MinValue="0"></lvcharts:Axis>
+                </lvcharts:CartesianChart.AxisX>
+                <lvcharts:CartesianChart.AxisY>
+                    <lvcharts:Axis Title="Sessions" Foreground="Black" LabelFormatter="{Binding CountFormatter}"  MinValue="0"></lvcharts:Axis>
+                </lvcharts:CartesianChart.AxisY>
+            </lvcharts:CartesianChart>
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type chart:Top5CustomerChart}">
+
+            <UniformGrid Columns="2" Rows="3" Margin="0,20">
+                <StackPanel Orientation="Vertical" Margin="10,0,10,20" Width="300" Height="150">
+                    <TextBlock Text="Total Logons (average per day)" FontSize="14" FontWeight="Bold" />
+                    <ItemsControl ItemsSource="{Binding TotalLogons}" Margin="5"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Margin="10,0,10,20" Width="300" Height="150">
+                    <TextBlock Text="Single Sign On Logons (average per day)" FontSize="14" FontWeight="Bold" />
+                    <ItemsControl ItemsSource="{Binding SingleSignOnLogons}" Margin="5"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Margin="10,0,10,20" Width="300" Height="150">
+                    <TextBlock Text="Mobile Logons (average per day)" FontSize="14" FontWeight="Bold" />
+                    <ItemsControl ItemsSource="{Binding MobileLogons}" Margin="5"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Margin="10,0,10,20" Width="300" Height="150">
+                    <TextBlock Text="SelfService Logons (average per day)" FontSize="14" FontWeight="Bold" />
+                    <ItemsControl ItemsSource="{Binding SelfServiceLogons}" Margin="5"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Margin="10,0,10,20" Width="300" Height="150">
+                    <TextBlock Text="Preceda Logons (average per day)" FontSize="14" FontWeight="Bold" />
+                    <ItemsControl ItemsSource="{Binding PrecedaLogons}" Margin="5"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Margin="10,0,10,20" Width="300" Height="150">
+                    <TextBlock Text="IE Logons (average per day)" FontSize="14" FontWeight="Bold" />
+                    <ItemsControl ItemsSource="{Binding IELogons}" Margin="5"/>
+                </StackPanel>
+            </UniformGrid>
+            
+            
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type local:CustomerRecord}">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="190"/>
+                    <ColumnDefinition Width="50"/>
+                    <ColumnDefinition Width="50"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding Customer}" Grid.Column="0"/>
+                <TextBlock Text="{Binding Average, StringFormat={}{0:n0}}" TextAlignment="Right" Grid.Column="1"/>
+                <TextBlock Text="{Binding Percentage, StringFormat={}{0:p2}}" TextAlignment="Right" Grid.Column="2"/>
+            </Grid>
+
+        </DataTemplate> 
+        
+    </Window.Resources>
+    
+    <Grid DataContext="{StaticResource ViewModel}">
+
+        <DockPanel LastChildFill="True">
+
+            <DockPanel DockPanel.Dock="Top" Margin="10" LastChildFill="False" >
+                <ComboBox ItemsSource="{Binding Charts}" DisplayMemberPath="Description" SelectedItem="{Binding SelectedChart}" DockPanel.Dock="Left" Margin="10,0" Width="150" Height="25"  />
+                <DatePicker SelectedDate="{Binding StartDate}" DockPanel.Dock="Left" Margin="10,0" Height="25"  />
+                <DatePicker SelectedDate="{Binding EndDate}" DockPanel.Dock="Left" Margin="10,0" Height="25"  />
+                <Button Content="Import Data" DockPanel.Dock="Right" Width="94" Margin="20,0" Height="25" Click="Button_Click_1"/>
+            </DockPanel>
+
+            <ContentControl Content="{Binding SelectedChart}" />
+
+        </DockPanel>
+
+
+    </Grid>
+</Window>
