@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.IO;
 using System.Threading;
 
 using System.Data.OleDb;
@@ -11,10 +10,10 @@ using System.Data.SQLite;
 
 namespace PrecedaSessionAnalyser.Import
 {
-    class DataImport
+    class PrecedaSessionImport : IDataImport
     {
         public string Server { get; }
-        public string User { get;}
+        public string User { get; }
         public string Password { get; }
         public string Library { get; }
 
@@ -34,7 +33,7 @@ namespace PrecedaSessionAnalyser.Import
         private int _ArchiveBrowserRecordCount = 100;
         private int _ArchiveClientRecordCount = 100;
 
-        public DataImport(string server, string library, string user, string password, string databasePath)
+        public PrecedaSessionImport(string server, string library, string user, string password, string databasePath)
         {
             Server = server;
             Library = library;
@@ -43,14 +42,7 @@ namespace PrecedaSessionAnalyser.Import
             DataBasePath = databasePath;
         }
 
-        public Task<int> ImportData(DateTime fromDate, DateTime toDate, CancellationToken cancellationToken, IProgress<DataImportProgress> progress)
-        {
-            var task = Task.Factory.StartNew(() => ImportDataTask(fromDate, toDate, CancellationToken.None, progress));
-
-            return task;
-        }
-
-        public int ImportDataTask(DateTime fromDate, DateTime toDate, CancellationToken cancellationToken, IProgress<DataImportProgress> progress)
+        public int ImportData(DateTime fromDate, DateTime toDate, CancellationToken cancellationToken, IProgress<DataImportProgress> progress)
         {
             progress.Report(new DataImportProgress(fromDate, 0, false));
 
@@ -297,7 +289,7 @@ namespace PrecedaSessionAnalyser.Import
                     _AddSessionsSQL.ExecuteNonQuery();
                 }
                 reader.Close();
-                
+
 
                 _SessionRecords.Remove(record);
             }
@@ -436,21 +428,6 @@ namespace PrecedaSessionAnalyser.Import
         }
     }
 
-
-    public class DataImportProgress
-    {
-        public bool Complete;
-        public DateTime LastTimeProcessed { get;  }
-        public int RecordsProcessed { get;  }
-
-        public DataImportProgress(DateTime lastTime, int records, bool complete)
-        {
-            Complete = complete;
-            LastTimeProcessed = lastTime;
-            RecordsProcessed = records;
-        }
-    }
-
     class SessionRecord
     {
         public DateTime Date { get; set; }
@@ -480,5 +457,4 @@ namespace PrecedaSessionAnalyser.Import
         public int LogonCount { get; set; }
         public int SingleSignOnCount { get; set; }
     }
-
 }

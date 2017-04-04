@@ -79,7 +79,7 @@ namespace PrecedaSessionAnalyser
 
         public Task<int> ImportData()
         {
-            var dataImporter = new DataImport(Server, Library, User, Password, _DataBasePath);
+            var dataImporter = new DataImport(Server, Library, User ,Password, _DataBasePath);
 
             InProgess = true;
             LastTimeImported = FromDate;

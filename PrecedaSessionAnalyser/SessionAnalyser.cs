@@ -18,8 +18,7 @@ namespace PrecedaSessionAnalyser
         {
             DatabasePath = databasePath;
 
-            if (!File.Exists(databasePath))
-                CreateDatabase();          
+            CreateDatabase();          
         }
 
         private void CreateDatabase()
@@ -27,21 +26,28 @@ namespace PrecedaSessionAnalyser
             var connection = new SQLiteConnection("Data Source=" + DatabasePath + ";Version=3;");
             connection.Open();
 
-            var sql = "CREATE TABLE Sessions (Date CHAR(10) NOT NULL, Hour INT NOT NULL, Product INT NOT NULL, LogonCount INT NOT NULL, ActiveCount INT NOT NULL, PRIMARY KEY(Date, Hour, Product))";
+            var sql = "CREATE TABLE IF NOT EXISTS Sessions (Date CHAR(10) NOT NULL, Hour INT NOT NULL, Product INT NOT NULL, LogonCount INT NOT NULL, ActiveCount INT NOT NULL, PRIMARY KEY(Date, Hour, Product))";
             var command = new SQLiteCommand(sql, connection);
             command.ExecuteNonQuery();
 
-            sql = "CREATE TABLE Browsers (Date CHAR(10) NOT NULL, Browser CHAR(20) NOT NULL, Device CHAR(20) NOT NULL, Count INT NOT NULL, PRIMARY KEY(Date, Browser, Device))";
+            sql = "CREATE TABLE IF NOT EXISTS Browsers (Date CHAR(10) NOT NULL, Browser CHAR(20) NOT NULL, Device CHAR(20) NOT NULL, Count INT NOT NULL, PRIMARY KEY(Date, Browser, Device))";
             command = new SQLiteCommand(sql, connection);
             command.ExecuteNonQuery();
 
-            sql = "CREATE TABLE Clients (Date CHAR(10) NOT NULL, Partition CHAR(3) NOT NULL, FileLibrary CHAR(10) NOT NULL, Product INT NOT NULL, LogonCount INT NOT NULL, SingleSignOnCount INT NOT NULL, PRIMARY KEY(Date, FileLibrary, Product))";
+            sql = "CREATE TABLE IF NOT EXISTS Clients (Date CHAR(10) NOT NULL, Partition CHAR(3) NOT NULL, FileLibrary CHAR(10) NOT NULL, Product INT NOT NULL, LogonCount INT NOT NULL, SingleSignOnCount INT NOT NULL, PRIMARY KEY(Date, FileLibrary, Product))";
+            command = new SQLiteCommand(sql, connection);
+            command.ExecuteNonQuery();
+
+            sql = "CREATE TABLE IF NOT EXISTS LansaJobs (Date CHAR(10) NOT NULL, Hour INT NOT NULL, Started INT NOT NULL, Active INT NOT NULL, StartedByWebServer INT NOT NULL, StartedByLANSA INT NOT NULL, TotalCPU INT NOT NULL, LogicalDataBaseReads INT NOT NULL, LogicalDataBaseWrites INT NOT NULL, PhysicalDataBaseReads INT NOT NULL, PhysicalDataBaseWrites INT NOT NULL, TotalIFSBytesRead INT NOT NULL, TotalIFSBytesWritten INT NOT NULL,PRIMARY KEY(Date, Hour))";
+            command = new SQLiteCommand(sql, connection);
+            command.ExecuteNonQuery();
+
+            sql = "CREATE TABLE IF NOT EXISTS WebServerRequests (Date CHAR(10) NOT NULL, Hour INT NOT NULL, TotalRequests INT NOT NULL, CGIRequests INT NOT NULL, IFSRequests INT NOT NULL,PRIMARY KEY(Date, Hour))";
             command = new SQLiteCommand(sql, connection);
             command.ExecuteNonQuery();
 
             connection.Close();
         }
-
 
         public SessionSummary GetSessionSummary(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
         {
@@ -241,6 +247,140 @@ namespace PrecedaSessionAnalyser
             }
 
             return top5;
+        }
+
+        public WebServerSummary GetWebServerSummary(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
+        {
+            var result = new WebServerSummary(startTime, endTime, frequency);
+
+            var connection = new SQLiteConnection("Data Source=" + DatabasePath + ";Version=3;");
+            connection.Open();
+
+            var sql = String.Format("SELECT Date, Hour, TotalRequests, CGIREquests, IFSRequests FROM WebServerRequests WHERE (Date >= \"{0:yyyy-MM-dd}\" AND  Date <= \"{1:yyyy-MM-dd}\")", startTime, endTime);
+            var command = new SQLiteCommand(sql, connection);
+            var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                var sessionTime = reader.GetDateTime(0).AddHours(reader.GetInt32(1));
+                var totalRequests = reader.GetInt64(2);
+                var cgiRequests = reader.GetInt64(3);
+                var ifsRequests = reader.GetInt64(4);
+
+                result.IncrementCount(sessionTime, totalRequests, cgiRequests, ifsRequests);
+            }
+
+            reader.Close();
+            connection.Close();
+
+            return result;
+        }
+
+        public StartedLansaJobSummary GetStartedLansaJobs(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
+        {
+            var result = new StartedLansaJobSummary(startTime, endTime, frequency);
+
+            var connection = new SQLiteConnection("Data Source=" + DatabasePath + ";Version=3;");
+            connection.Open();
+
+            var sql = String.Format("SELECT Date, Hour, Started, StartedByLansa, StartedByWebServer FROM LansaJobs WHERE (Date >= \"{0:yyyy-MM-dd}\" AND  Date <= \"{1:yyyy-MM-dd}\")", startTime, endTime);
+            var command = new SQLiteCommand(sql, connection);
+            var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                var sessionTime = reader.GetDateTime(0).AddHours(reader.GetInt32(1));
+                var started = reader.GetInt64(2);
+                var lansa = reader.GetInt64(3);
+                var webserver = reader.GetInt64(4);
+
+                result.IncrementCount(sessionTime, started, lansa, webserver);
+            }
+
+            reader.Close();
+            connection.Close();
+
+            return result;
+        }
+
+        public ActiveLansaJobSummary GetActiveLansaJobs(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
+        {
+            var result = new ActiveLansaJobSummary(startTime, endTime, frequency);
+
+            var connection = new SQLiteConnection("Data Source=" + DatabasePath + ";Version=3;");
+            connection.Open();
+
+            var sql = String.Format("SELECT Date, Hour, Active FROM LansaJobs WHERE (Date >= \"{0:yyyy-MM-dd}\" AND  Date <= \"{1:yyyy-MM-dd}\")", startTime, endTime);
+            var command = new SQLiteCommand(sql, connection);
+            var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                var sessionTime = reader.GetDateTime(0).AddHours(reader.GetInt32(1));
+                var active = reader.GetInt64(2);
+
+                result.IncrementCount(sessionTime, active);
+            }
+
+            reader.Close();
+            connection.Close();
+
+            return result;
+        }
+
+        public LansaJobCPUSummary GetLansaJobsCpu(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
+        {
+            var result = new LansaJobCPUSummary(startTime, endTime, frequency);
+
+            var connection = new SQLiteConnection("Data Source=" + DatabasePath + ";Version=3;");
+            connection.Open();
+
+            var sql = String.Format("SELECT Date, Hour, TotalCPU FROM LansaJobs WHERE (Date >= \"{0:yyyy-MM-dd}\" AND  Date <= \"{1:yyyy-MM-dd}\")", startTime, endTime);
+            var command = new SQLiteCommand(sql, connection);
+            var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                var sessionTime = reader.GetDateTime(0).AddHours(reader.GetInt32(1));
+                var cpu = reader.GetInt64(2);
+
+                result.IncrementCount(sessionTime, cpu);
+            }
+
+            reader.Close();
+            connection.Close();
+
+            return result;
+        }
+
+        public LansaJobIOSummary GetLansaJobsIO(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
+        {
+            var result = new LansaJobIOSummary(startTime, endTime, frequency);
+
+            var connection = new SQLiteConnection("Data Source=" + DatabasePath + ";Version=3;");
+            connection.Open();
+
+            var sql = String.Format("SELECT Date, Hour, LogicalDatabaseReads, LogicalDatabaseWrites, PhysicalDatabaseReads, PhysicalDatabaseWrites, TotalIFSBytesRead, TotalIFSBytesWritten FROM LansaJobs WHERE (Date >= \"{0:yyyy-MM-dd}\" AND  Date <= \"{1:yyyy-MM-dd}\")", startTime, endTime);
+            var command = new SQLiteCommand(sql, connection);
+            var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                var sessionTime = reader.GetDateTime(0).AddHours(reader.GetInt32(1));
+                var logicalDBRead = reader.GetInt64(2);
+                var logicalDBWrite = reader.GetInt64(3);
+                var physicalDBRead = reader.GetInt64(4);
+                var physicalDBWrite = reader.GetInt64(5);
+                var ifsRead = reader.GetInt64(6) / 1024;
+                var ifsWritten = reader.GetInt64(7) / 1024;
+
+                result.IncrementCount(sessionTime, logicalDBRead, logicalDBWrite, physicalDBRead, physicalDBWrite, ifsRead, ifsWritten);
+            }
+
+            reader.Close();
+            connection.Close();
+
+            return result;
         }
 
         private DateTime DBToDateTime(string dbDate)

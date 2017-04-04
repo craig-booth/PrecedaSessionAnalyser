@@ -111,6 +111,11 @@ namespace PrecedaSessionAnalyser
             Charts.Add(new Charts.DeviceChart(_Analyser));
             Charts.Add(new Charts.SingleSignOnChart(_Analyser));
             Charts.Add(new Charts.Top5CustomerChart(_Analyser));
+            Charts.Add(new Charts.WebServerRequests(_Analyser));
+            Charts.Add(new Charts.StartedWebJobsChart(_Analyser));
+            Charts.Add(new Charts.ActiveWebJobsChart(_Analyser));
+            Charts.Add(new Charts.WebJobCPUChart(_Analyser));
+            Charts.Add(new Charts.WebJobIOChart(_Analyser));
 
             _SelectedChart = Charts[0];
 
