@@ -22,7 +22,7 @@ namespace PrecedaSessionAnalyser.Charts
         {
             ChartSeriesCollection.Clear();
 
-            var summary = _SessionAnalyser.GetSessionSummary(fromDate, toDate.AddHours(23).AddMinutes(59).AddSeconds(59), frequency);
+            var summary = _SessionAnalyser.GetSessionSummary(fromDate, toDate, frequency);
 
             Labels.Clear();
             foreach (var record in summary.Data)

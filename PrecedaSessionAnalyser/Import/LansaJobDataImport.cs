@@ -66,7 +66,7 @@ namespace PrecedaSessionAnalyser.Import
                         var submittedBy = reader.GetString(1);
                         var jobStatus = (IBMJobStatusFlag)reader.GetDecimal(2);
                         var jobCount = reader.GetInt32(3);
-                        var totalCPU = (int)reader.GetDecimal(4);
+                        var totalCPU = (int)(reader.GetDecimal(4) / 1000);
                         var logicalDBReads = (int)reader.GetDecimal(5);
                         var logicalDBWrites = (int)reader.GetDecimal(6);
                         var physicalDBReads = (int)reader.GetDecimal(7);
