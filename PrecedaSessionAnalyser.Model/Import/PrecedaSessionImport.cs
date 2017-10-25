@@ -8,22 +8,13 @@ using System.Threading;
 using System.Data.OleDb;
 using System.Data.SQLite;
 
-namespace PrecedaSessionAnalyser.Import
+namespace PrecedaSessionAnalyser.Model.Import
 {
-    class PrecedaSessionImport : IDataImport
+    class PrecedaSessionImport : DataImport, IDataImport
     {
-        public string Server { get; }
-        public string User { get; }
-        public string Password { get; }
-        public string Library { get; }
-
-        public string DataBasePath { get; }
-
         private List<SessionRecord> _SessionRecords = new List<SessionRecord>();
         private List<BrowserRecord> _BrowserRecords = new List<BrowserRecord>();
         private List<ClientRecord> _ClientRecords = new List<ClientRecord>();
-
-        private SQLiteConnection _SqliteConnection;
 
         private int _MaxSessionRecordCount = 500;
         private int _MaxBrowserRecordCount = 500;
@@ -33,34 +24,16 @@ namespace PrecedaSessionAnalyser.Import
         private int _ArchiveBrowserRecordCount = 100;
         private int _ArchiveClientRecordCount = 100;
 
-        public PrecedaSessionImport(string server, string library, string user, string password, string databasePath)
+        public PrecedaSessionImport(string server, string user, string password, string library)
+            : base("Preceda Sessions", server, user, password, library)
         {
-            Server = server;
-            Library = library;
-            User = user;
-            Password = password;
-            DataBasePath = databasePath;
         }
 
-        public int ImportData(DateTime fromDate, DateTime toDate, CancellationToken cancellationToken, IProgress<DataImportProgress> progress)
+        public int ImportData(DateTime fromDate, DateTime toDate, SQLiteConnection sessionDatabase, IProgress<DataImportProgress> progress)
         {
-            progress.Report(new DataImportProgress(fromDate, 0, false));
+            OnImportStarted(progress, fromDate);
 
-            _SqliteConnection = new SQLiteConnection("Data Source=" + DataBasePath + ";Version=3;");
-            _SqliteConnection.Open();
-
-            // Setup OLEDB connection string
-            var connectionStringBuilder = new OleDbConnectionStringBuilder();
-            connectionStringBuilder["Provider"] = "IBMDA400";
-            connectionStringBuilder["Data Source"] = Server;
-            connectionStringBuilder["User Id"] = User;
-            connectionStringBuilder["Password"] = Password;
-            connectionStringBuilder["Default Collection"] = Library;
-            connectionStringBuilder["Force Translate"] = "0";
-            var connectionString = connectionStringBuilder.ConnectionString;
-
-            var connection = new OleDbConnection(connectionString);
-            connection.Open();
+            var connection = ConnectToServer();
 
             var sql = String.Format("SELECT PP54TYP, PP54STR, PP54END, PP54UTP, PP54DKV, PP54PRT, PP54FLB, PP54SSO, PP54BRW, PP54DEV FROM PPF54 WHERE PP54STR BETWEEN '{0:yyyy-MM-dd-00.00.00.000000}' AND '{1:yyyy-MM-dd-23.59.59.000000}'", fromDate, toDate);
             OleDbCommand command = new OleDbCommand(sql, connection);
@@ -98,35 +71,31 @@ namespace PrecedaSessionAnalyser.Import
                 var device = reader.GetString(9);
 
 
-                UpdateSessionRecords(sessionStart, sessionEnd, product);
-                UpdateBrowserRecord(sessionStart.Date, browser, device);
-                UpdateClientRecord(sessionStart.Date, partition, fileLibrary, product, singleSignOn);
+                UpdateSessionRecords(sessionDatabase, sessionStart, sessionEnd, product);
+                UpdateBrowserRecord(sessionDatabase, sessionStart.Date, browser, device);
+                UpdateClientRecord(sessionDatabase, sessionStart.Date, partition, fileLibrary, product, singleSignOn);
 
                 // Report Progress
                 RecordsProcessed++;
                 if ((RecordsProcessed % 1000) == 0)
                 {
-                    progress.Report(new DataImportProgress(sessionStart, RecordsProcessed, false));
+                    OnImportProgress(progress, sessionStart, RecordsProcessed);
                 }
-
-                // Check for Cancellation
-                if (cancellationToken.IsCancellationRequested)
-                    break;
             }
 
             reader.Close();
             connection.Close();
 
-            WriteSessionRecordsToDatabase(true);
-            WriteBrowserRecordsToDatabase(true);
-            WriteClientRecordsToDatabase(true);
+            WriteSessionRecordsToDatabase(sessionDatabase, true);
+            WriteBrowserRecordsToDatabase(sessionDatabase, true);
+            WriteClientRecordsToDatabase(sessionDatabase, true);
 
-            progress.Report(new DataImportProgress(toDate, RecordsProcessed, true));
+            OnImportComplete(progress, toDate, RecordsProcessed);
 
             return RecordsProcessed;
         }
 
-        private void UpdateSessionRecords(DateTime sessionStart, DateTime sessionEnd, Product product)
+        private void UpdateSessionRecords(SQLiteConnection sessionDatabase, DateTime sessionStart, DateTime sessionEnd, Product product)
         {
 
             // Get the summary records that this session was active for
@@ -139,7 +108,7 @@ namespace PrecedaSessionAnalyser.Import
 
                 var sessionRecord = _SessionRecords.FirstOrDefault(x => (x.Date == date) && (x.Hour == hour) && (x.Product == product));
                 if (sessionRecord == null)
-                    sessionRecord = AddSessionRecord(date, hour, product);
+                    sessionRecord = AddSessionRecord(sessionDatabase, date, hour, product);
 
 
                 if ((date == sessionStart.Date) && (hour == sessionStart.Hour))
@@ -157,22 +126,22 @@ namespace PrecedaSessionAnalyser.Import
         }
 
 
-        private void UpdateBrowserRecord(DateTime date, string browser, string device)
+        private void UpdateBrowserRecord(SQLiteConnection sessionDatabase, DateTime date, string browser, string device)
         {
 
             var browserRecord = _BrowserRecords.FirstOrDefault(x => (x.Date == date) && (x.Browser == browser) && (x.Device == device));
             if (browserRecord == null)
-                browserRecord = AddBrowserRecord(date, browser, device);
+                browserRecord = AddBrowserRecord(sessionDatabase, date, browser, device);
 
             browserRecord.Count++;
         }
 
-        private void UpdateClientRecord(DateTime date, string partition, string fileLibrary, Product product, bool singleSignOn)
+        private void UpdateClientRecord(SQLiteConnection sessionDatabase, DateTime date, string partition, string fileLibrary, Product product, bool singleSignOn)
         {
 
             var clientRecord = _ClientRecords.FirstOrDefault(x => (x.Date == date) && (x.Partition == partition) && (x.FileLibrary == fileLibrary) && (x.Product == product));
             if (clientRecord == null)
-                clientRecord = AddClientRecord(date, partition, fileLibrary, product);
+                clientRecord = AddClientRecord(sessionDatabase, date, partition, fileLibrary, product);
 
             clientRecord.LogonCount++;
             if (singleSignOn)
@@ -180,10 +149,10 @@ namespace PrecedaSessionAnalyser.Import
         }
 
 
-        private SessionRecord AddSessionRecord(DateTime date, int hour, Product product)
+        private SessionRecord AddSessionRecord(SQLiteConnection sessionDatabase, DateTime date, int hour, Product product)
         {
             if (_SessionRecords.Count >= _MaxSessionRecordCount)
-                WriteSessionRecordsToDatabase(false);
+                WriteSessionRecordsToDatabase(sessionDatabase, false);
 
             var record = new SessionRecord()
             {
@@ -197,10 +166,10 @@ namespace PrecedaSessionAnalyser.Import
             return record;
         }
 
-        private BrowserRecord AddBrowserRecord(DateTime date, string browser, string device)
+        private BrowserRecord AddBrowserRecord(SQLiteConnection sessionDatabase, DateTime date, string browser, string device)
         {
             if (_BrowserRecords.Count >= _MaxBrowserRecordCount)
-                WriteBrowserRecordsToDatabase(false);
+                WriteBrowserRecordsToDatabase(sessionDatabase, false);
 
             var record = new BrowserRecord()
             {
@@ -214,10 +183,10 @@ namespace PrecedaSessionAnalyser.Import
             return record;
         }
 
-        private ClientRecord AddClientRecord(DateTime date, string partition, string fileLibrary, Product product)
+        private ClientRecord AddClientRecord(SQLiteConnection sessionDatabase, DateTime date, string partition, string fileLibrary, Product product)
         {
             if (_ClientRecords.Count >= _MaxClientRecordCount)
-                WriteClientRecordsToDatabase(false);
+                WriteClientRecordsToDatabase(sessionDatabase, false);
 
             var record = new ClientRecord()
             {
@@ -236,7 +205,7 @@ namespace PrecedaSessionAnalyser.Import
         private SQLiteCommand _AddSessionsSQL;
         private SQLiteCommand _UpdateSessionsSQL;
         private SQLiteCommand _ReadSessionsSQL;
-        private void WriteSessionRecordsToDatabase(bool writeAll)
+        private void WriteSessionRecordsToDatabase(SQLiteConnection sessionDatabase, bool writeAll)
         {
             IEnumerable<SessionRecord> recordsToWrite;
             if (writeAll)
@@ -246,17 +215,16 @@ namespace PrecedaSessionAnalyser.Import
 
             if (_AddSessionsSQL == null)
             {
-                _AddSessionsSQL = new SQLiteCommand("INSERT INTO Sessions(Date, Hour, Product, LogonCount, ActiveCount) VALUES(@Date, @Hour, @Product, @LogonCount, @ActiveCount)", _SqliteConnection);
+                _AddSessionsSQL = new SQLiteCommand("INSERT INTO Sessions(Date, Hour, Product, LogonCount, ActiveCount) VALUES(@Date, @Hour, @Product, @LogonCount, @ActiveCount)", sessionDatabase);
                 _AddSessionsSQL.Prepare();
 
-                _UpdateSessionsSQL = new SQLiteCommand("UPDATE Sessions SET LogonCount = @LogonCount, ActiveCount =  @ActiveCount WHERE Date = @Date AND Hour = @Hour AND Product = @Product", _SqliteConnection);
+                _UpdateSessionsSQL = new SQLiteCommand("UPDATE Sessions SET LogonCount = @LogonCount, ActiveCount =  @ActiveCount WHERE Date = @Date AND Hour = @Hour AND Product = @Product", sessionDatabase);
                 _UpdateSessionsSQL.Prepare();
 
-                _ReadSessionsSQL = new SQLiteCommand("SELECT LogonCount, ActiveCount From Sessions WHERE Date = @Date AND Hour = @Hour AND Product = @Product", _SqliteConnection);
+                _ReadSessionsSQL = new SQLiteCommand("SELECT LogonCount, ActiveCount From Sessions WHERE Date = @Date AND Hour = @Hour AND Product = @Product", sessionDatabase);
                 _ReadSessionsSQL.Prepare();
             }
 
-            var transaction = _SqliteConnection.BeginTransaction();
             foreach (var record in recordsToWrite)
             {
                 _ReadSessionsSQL.Parameters.AddWithValue("@Date", record.Date.ToString("yyy-MM-dd"));
@@ -293,15 +261,12 @@ namespace PrecedaSessionAnalyser.Import
 
                 _SessionRecords.Remove(record);
             }
-
-            transaction.Commit();
-
         }
 
         private SQLiteCommand _AddBrowserSQL;
         private SQLiteCommand _UpdateBrowserSQL;
         private SQLiteCommand _ReadBrowserSQL;
-        private void WriteBrowserRecordsToDatabase(bool writeAll)
+        private void WriteBrowserRecordsToDatabase(SQLiteConnection sessionDatabase, bool writeAll)
         {
             IEnumerable<BrowserRecord> recordsToWrite;
             if (writeAll)
@@ -311,17 +276,16 @@ namespace PrecedaSessionAnalyser.Import
 
             if (_AddBrowserSQL == null)
             {
-                _AddBrowserSQL = new SQLiteCommand("INSERT INTO Browsers(Date, Browser, Device, Count) VALUES(@Date, @Browser, @Device, @Count)", _SqliteConnection);
+                _AddBrowserSQL = new SQLiteCommand("INSERT INTO Browsers(Date, Browser, Device, Count) VALUES(@Date, @Browser, @Device, @Count)", sessionDatabase);
                 _AddBrowserSQL.Prepare();
 
-                _UpdateBrowserSQL = new SQLiteCommand("UPDATE Browsers SET Count = @Count WHERE Date = @Date AND Browser = @Browser AND Device = @Device", _SqliteConnection);
+                _UpdateBrowserSQL = new SQLiteCommand("UPDATE Browsers SET Count = @Count WHERE Date = @Date AND Browser = @Browser AND Device = @Device", sessionDatabase);
                 _UpdateBrowserSQL.Prepare();
 
-                _ReadBrowserSQL = new SQLiteCommand("SELECT  Count From Browsers WHERE Date = @Date AND Browser = @Browser AND Device = @Device", _SqliteConnection);
+                _ReadBrowserSQL = new SQLiteCommand("SELECT  Count From Browsers WHERE Date = @Date AND Browser = @Browser AND Device = @Device", sessionDatabase);
                 _ReadBrowserSQL.Prepare();
             }
 
-            var transaction = _SqliteConnection.BeginTransaction();
             foreach (var record in recordsToWrite)
             {
                 _ReadBrowserSQL.Parameters.AddWithValue("@Date", record.Date.ToString("yyy-MM-dd"));
@@ -354,13 +318,12 @@ namespace PrecedaSessionAnalyser.Import
 
                 _BrowserRecords.Remove(record);
             }
-            transaction.Commit();
         }
 
         private SQLiteCommand _AddClientSQL;
         private SQLiteCommand _UpdateClientSQL;
         private SQLiteCommand _ReadClientSQL;
-        private void WriteClientRecordsToDatabase(bool writeAll)
+        private void WriteClientRecordsToDatabase(SQLiteConnection sessionDatabase, bool writeAll)
         {
             IEnumerable<ClientRecord> recordsToWrite;
             if (writeAll)
@@ -371,18 +334,17 @@ namespace PrecedaSessionAnalyser.Import
 
             if (_AddClientSQL == null)
             {
-                _AddClientSQL = new SQLiteCommand("INSERT INTO Clients(Date, Partition, FileLibrary, Product, LogonCount, SingleSignOnCount) VALUES(@Date, @Partition, @FileLibrary, @Product, @LogonCount, @SingleSignOnCount)", _SqliteConnection);
+                _AddClientSQL = new SQLiteCommand("INSERT INTO Clients(Date, Partition, FileLibrary, Product, LogonCount, SingleSignOnCount) VALUES(@Date, @Partition, @FileLibrary, @Product, @LogonCount, @SingleSignOnCount)", sessionDatabase);
                 _AddClientSQL.Prepare();
 
-                _UpdateClientSQL = new SQLiteCommand("UPDATE Clients SET LogonCount = @LogonCount, SingleSignOnCount = @SingleSignOnCount WHERE Date = @Date AND FileLibrary = @FileLibrary AND Product = @Product", _SqliteConnection);
+                _UpdateClientSQL = new SQLiteCommand("UPDATE Clients SET LogonCount = @LogonCount, SingleSignOnCount = @SingleSignOnCount WHERE Date = @Date AND FileLibrary = @FileLibrary AND Product = @Product", sessionDatabase);
                 _UpdateClientSQL.Prepare();
 
-                _ReadClientSQL = new SQLiteCommand("SELECT LogonCount, SingleSignOnCount From Clients WHERE Date = @Date AND FileLibrary = @FileLibrary AND Product = @Product", _SqliteConnection);
+                _ReadClientSQL = new SQLiteCommand("SELECT LogonCount, SingleSignOnCount From Clients WHERE Date = @Date AND FileLibrary = @FileLibrary AND Product = @Product", sessionDatabase);
                 _ReadClientSQL.Prepare();
             }
 
 
-            var transaction = _SqliteConnection.BeginTransaction();
             foreach (var record in recordsToWrite)
             {
                 _ReadClientSQL.Parameters.AddWithValue("@Date", record.Date.ToString("yyy-MM-dd"));
@@ -418,7 +380,6 @@ namespace PrecedaSessionAnalyser.Import
 
                 _ClientRecords.Remove(record);
             }
-            transaction.Commit();
         }
 
         private DateTime DBToDateTime(string dbDate)

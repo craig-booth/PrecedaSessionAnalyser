@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyser.Model
 {
-    abstract class SummaryData<R> where R : SummaryRecord, new()
+    public abstract class SummaryData<R> where R : SummaryRecord, new()
     {
         public DateTime StartTime { get; private set; }
         public DateTime EndTime { get; private set; }
@@ -86,7 +86,7 @@ namespace PrecedaSessionAnalyser
 
     }
 
-    abstract class SummaryRecord
+    public abstract class SummaryRecord
     {
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }

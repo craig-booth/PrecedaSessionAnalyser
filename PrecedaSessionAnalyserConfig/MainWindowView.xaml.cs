@@ -12,25 +12,27 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using System.Globalization;
-using System.IO;
 
-using LiveCharts;
-using LiveCharts.Wpf;
-
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyserConfig
 {
-
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
-
         public MainWindow()
         {
             InitializeComponent();
         }
-    }
 
+        private void txtPassword_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            var passwordBox = (PasswordBox)sender;
+
+            if (passwordBox.DataContext != null)
+            {
+                ((MainWindowViewModel)passwordBox.DataContext).Password = passwordBox.Password;
+            }
+        }
+    }
 }

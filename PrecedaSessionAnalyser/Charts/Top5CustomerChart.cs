@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Collections.ObjectModel;
 
+using PrecedaSessionAnalyser.Model;
+
 namespace PrecedaSessionAnalyser.Charts
 {
     class Top5CustomerChart : BaseChart

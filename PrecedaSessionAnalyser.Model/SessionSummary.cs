@@ -4,11 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyser.Model
 {
 
 
-    class SessionSummary : SummaryData<SessionRecord>
+    public class SessionSummary : SummaryData<SessionRecord>
     {
         public SessionSummary(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
             : base(startTime, endTime, frequency)
@@ -51,7 +51,7 @@ namespace PrecedaSessionAnalyser
 
     }
 
-    class SessionRecord : SummaryRecord
+    public class SessionRecord : SummaryRecord
     {
         public int ActiveMobileSessions { get; set; }
         public int MobileLogons { get; set; }

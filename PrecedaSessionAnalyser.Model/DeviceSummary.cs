@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyser.Model
 {
-    class DeviceSummary : SummaryData<DeviceRecord>
+    public class DeviceSummary : SummaryData<DeviceRecord>
     {
         public HashSet<string> DeviceNames { get; } = new HashSet<string>();
 
@@ -37,7 +37,7 @@ namespace PrecedaSessionAnalyser
     }
 
 
-    class DeviceRecord : SummaryRecord
+    public class DeviceRecord : SummaryRecord
     {
         public Dictionary<string, int> DeviceCount { get; } = new Dictionary<string, int>();
 

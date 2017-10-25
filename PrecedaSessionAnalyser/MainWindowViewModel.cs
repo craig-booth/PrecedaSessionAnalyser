@@ -9,7 +9,7 @@ using System.Collections.ObjectModel;
 using LiveCharts;
 using LiveCharts.Wpf;
 
-
+using PrecedaSessionAnalyser.Model;
 using PrecedaSessionAnalyser.Charts;
 
 namespace PrecedaSessionAnalyser

@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyser.Model
 {
-    class WebServerSummary : SummaryData<WebServerRecord>
+    public class WebServerSummary : SummaryData<WebServerRecord>
     {
         public WebServerSummary(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
             : base(startTime, endTime, frequency)
@@ -29,7 +29,7 @@ namespace PrecedaSessionAnalyser
 
     }
 
-    class WebServerRecord : SummaryRecord
+    public class WebServerRecord : SummaryRecord
     {
         public long TotalRequests { get; set; }
         public long CGIRequests { get; set; }

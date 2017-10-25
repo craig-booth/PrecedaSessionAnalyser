@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyser.Model
 {
 
-    class StartedLansaJobSummary : SummaryData<StartedLansaJobRecord>
+    public class StartedLansaJobSummary : SummaryData<StartedLansaJobRecord>
     {
         public StartedLansaJobSummary(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
             : base(startTime, endTime, frequency)
@@ -28,7 +28,7 @@ namespace PrecedaSessionAnalyser
 
     }
 
-    class ActiveLansaJobSummary : SummaryData<ActiveLansaJobRecord>
+    public class ActiveLansaJobSummary : SummaryData<ActiveLansaJobRecord>
     {
         public ActiveLansaJobSummary(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
             : base(startTime, endTime, frequency)
@@ -48,7 +48,7 @@ namespace PrecedaSessionAnalyser
     }
 
 
-    class LansaJobCPUSummary : SummaryData<LansaJobCPURecord>
+    public class LansaJobCPUSummary : SummaryData<LansaJobCPURecord>
     {
         public LansaJobCPUSummary(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
             : base(startTime, endTime, frequency)
@@ -67,7 +67,7 @@ namespace PrecedaSessionAnalyser
 
     }
 
-    class LansaJobIOSummary : SummaryData<LansaJobIORecord>
+    public class LansaJobIOSummary : SummaryData<LansaJobIORecord>
     {
         public LansaJobIOSummary(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
             : base(startTime, endTime, frequency)
@@ -91,24 +91,24 @@ namespace PrecedaSessionAnalyser
 
     }
 
-    class StartedLansaJobRecord : SummaryRecord
+    public class StartedLansaJobRecord : SummaryRecord
     {
         public long Started { get; set; }
         public long StartedByLANSA { get; set; }
         public long StartedByWebServer { get; set; }
     }
 
-    class ActiveLansaJobRecord : SummaryRecord
+    public class ActiveLansaJobRecord : SummaryRecord
     {
         public long Count { get; set; }
     }
 
-    class LansaJobCPURecord : SummaryRecord
+    public class LansaJobCPURecord : SummaryRecord
     {
         public long CPUSeconds { get; set; }
     }
 
-    class LansaJobIORecord : SummaryRecord
+    public class LansaJobIORecord : SummaryRecord
     {
         public long LogicalDataBaseReads { get; set; }
         public long LogicalDataBaseWrites { get; set; }

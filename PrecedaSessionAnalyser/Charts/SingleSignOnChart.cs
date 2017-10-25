@@ -8,6 +8,8 @@ using System.Windows.Media;
 using LiveCharts;
 using LiveCharts.Wpf;
 
+using PrecedaSessionAnalyser.Model;
+
 namespace PrecedaSessionAnalyser.Charts
 {
     class SingleSignOnChart : CartesianChart

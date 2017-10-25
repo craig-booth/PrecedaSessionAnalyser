@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyser.Model
 {
 
-    class SingleSignOnSummary : SummaryData<SessionRecord>
+    public class SingleSignOnSummary : SummaryData<SessionRecord>
     {
         public SingleSignOnSummary(DateTime startTime, DateTime endTime, PeriodFrequency frequency)
             : base(startTime, endTime, frequency)
@@ -46,7 +46,7 @@ namespace PrecedaSessionAnalyser
 
     }
 
-    class SingleSignOnRecord : SummaryRecord
+    public class SingleSignOnRecord : SummaryRecord
     {
         public int MobileLogons { get; set; }
         public int SelfServiceLogons { get; set; }

@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using LiveCharts;
 using LiveCharts.Wpf;
 
+using PrecedaSessionAnalyser.Model;
+
 namespace PrecedaSessionAnalyser.Charts
 {
     abstract class BaseChart

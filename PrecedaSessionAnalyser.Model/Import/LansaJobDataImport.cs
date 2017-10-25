@@ -9,7 +9,7 @@ using System.Threading;
 using System.Data.OleDb;
 using System.Data.SQLite;
 
-namespace PrecedaSessionAnalyser.Import
+namespace PrecedaSessionAnalyser.Model.Import
 {
     class LansaJobDataImport : IBMPerformanceDataImport, IDataImport
     {
@@ -17,38 +17,20 @@ namespace PrecedaSessionAnalyser.Import
         private int _ArchiveRecordCount = 100;
         private List<LansaJobRecord> _JobRecords = new List<LansaJobRecord>();
 
-        public string DataBasePath { get; }
-        private SQLiteConnection _SqliteConnection;
-
-        public LansaJobDataImport(string server, string user, string password, string databasePath)
-            : base(server, user, password)
+        public LansaJobDataImport(string server, string user, string password)
+            : base("LANSA Jobs", server, user, password)
         {
-            DataBasePath = databasePath;
         }
 
-        public int ImportData(DateTime fromDate, DateTime toDate, CancellationToken cancellationToken, IProgress<DataImportProgress> progress)
+        public int ImportData(DateTime fromDate, DateTime toDate, SQLiteConnection sessionDatabase, IProgress<DataImportProgress> progress)
         {
-            progress.Report(new DataImportProgress(fromDate, 0, false));
+            OnImportStarted(progress, fromDate);
 
-            _SqliteConnection = new SQLiteConnection("Data Source=" + DataBasePath + ";Version=3;");
-            _SqliteConnection.Open();
-
-            // Setup OLEDB connection string
-            var connectionStringBuilder = new OleDbConnectionStringBuilder();
-            connectionStringBuilder["Provider"] = "IBMDA400";
-            connectionStringBuilder["Data Source"] = Server;
-            connectionStringBuilder["User Id"] = User;
-            connectionStringBuilder["Password"] = Password;
-            connectionStringBuilder["Default Collection"] = "QPFRDATA";
-            connectionStringBuilder["Force Translate"] = "0";
-            var connectionString = connectionStringBuilder.ConnectionString;
-
-            var connection = new OleDbConnection(connectionString);
-            connection.Open();
+            var connection = ConnectToServer();
 
             int RecordsProcessed = 0;
 
-            var memberList = GetAvailableMembers(connection, "QAPMJOBOS"); // Uses this file as QAPMJOBL is a logical
+            var memberList = GetAvailableMembers(connection);
 
             foreach (var member in memberList.Where(x => (x.StartTime.Date >= fromDate) && (x.StartTime.Date <= toDate)))
             {
@@ -58,75 +40,78 @@ namespace PrecedaSessionAnalyser.Import
                 var sql = String.Format("SELECT INTNUM, JBSJNM, JBSTSF, count(*), sum(JBCPU), sum(JBLRD), sum(JBLWT), sum(JBDBR) + sum(JBADBR), sum(JBDBW) + sum(JBADBW), sum(JBXRFR), sum(JBXRFW) FROM QTEMP.QAPMJOBL WHERE JBNAME = 'LWEB_JOB' GROUP BY INTNUM, JBSJNM, JBSTSF ORDER BY INTNUM");
                 OleDbCommand command = new OleDbCommand(sql, connection);
 
-                using (var reader = command.ExecuteReader())
+                try
                 {
-                    while (reader.Read())
+                    using (var reader = command.ExecuteReader())
                     {
-                        var interval = (int)reader.GetDecimal(0);
-                        var submittedBy = reader.GetString(1);
-                        var jobStatus = (IBMJobStatusFlag)reader.GetDecimal(2);
-                        var jobCount = reader.GetInt32(3);
-                        var totalCPU = (int)(reader.GetDecimal(4) / 1000);
-                        var logicalDBReads = (int)reader.GetDecimal(5);
-                        var logicalDBWrites = (int)reader.GetDecimal(6);
-                        var physicalDBReads = (int)reader.GetDecimal(7);
-                        var physicalDBWrites = (int)reader.GetDecimal(8);
-                        var totalIFSBytesRead = (int)reader.GetDecimal(9);
-                        var totalIFSBytesWritten = (int)reader.GetDecimal(10);
-
-                        var startTime = member.StartTime.AddMinutes((interval - 1) * 5);
-
-                        var jobRecord = _JobRecords.FirstOrDefault(x => (x.Date == startTime.Date) && (x.Hour == startTime.Hour));
-                        if (jobRecord == null)
-                            jobRecord = AddJobRecord(startTime.Date, startTime.Hour);
-
-                        if ((jobStatus == IBMJobStatusFlag.Started) || (jobStatus == IBMJobStatusFlag.StartedAndEnded))
+                        while (reader.Read())
                         {
-                            jobRecord.Started += jobCount;
+                            var interval = (int)reader.GetDecimal(0);
+                            var submittedBy = reader.GetString(1);
+                            var jobStatus = (IBMJobStatusFlag)reader.GetDecimal(2);
+                            var jobCount = reader.GetInt32(3);
+                            var totalCPU = (int)(reader.GetDecimal(4) / 1000);
+                            var logicalDBReads = (int)reader.GetDecimal(5);
+                            var logicalDBWrites = (int)reader.GetDecimal(6);
+                            var physicalDBReads = (int)reader.GetDecimal(7);
+                            var physicalDBWrites = (int)reader.GetDecimal(8);
+                            var totalIFSBytesRead = (int)reader.GetDecimal(9);
+                            var totalIFSBytesWritten = (int)reader.GetDecimal(10);
 
-                            if (submittedBy == "LWEB_MON")
-                                jobRecord.StartedByLANSA += jobCount; 
-                            else
-                                jobRecord.StartedByWebServer += jobCount;
+                            var startTime = member.StartTime.AddMinutes((interval - 1) * member.Interval);
+
+                            var jobRecord = _JobRecords.FirstOrDefault(x => (x.Date == startTime.Date) && (x.Hour == startTime.Hour));
+                            if (jobRecord == null)
+                                jobRecord = AddJobRecord(sessionDatabase, startTime.Date, startTime.Hour);
+
+                            if ((jobStatus == IBMJobStatusFlag.Started) || (jobStatus == IBMJobStatusFlag.StartedAndEnded))
+                            {
+                                jobRecord.Started += jobCount;
+
+                                if (submittedBy == "LWEB_MON")
+                                    jobRecord.StartedByLANSA += jobCount;
+                                else
+                                    jobRecord.StartedByWebServer += jobCount;
+                            }
+
+                            jobRecord.Active += jobCount;
+                            jobRecord.TotalCPU += totalCPU;
+                            jobRecord.LogicalDataBaseReads = logicalDBReads;
+                            jobRecord.LogicalDataBaseWrites = logicalDBWrites;
+                            jobRecord.PhysicalDataBaseReads += physicalDBReads;
+                            jobRecord.PhysicalDataBaseWrites += physicalDBWrites;
+                            jobRecord.TotalIFSBytesRead += totalIFSBytesRead;
+                            jobRecord.TotalIFSBytesWritten += totalIFSBytesWritten;
+
+
+                            // Report Progress
+                            RecordsProcessed++;
+                            if ((RecordsProcessed % 1000) == 0)
+                            {
+                                OnImportProgress(progress, startTime, RecordsProcessed);
+                            }
                         }
-
-                        jobRecord.Active += jobCount;
-                        jobRecord.TotalCPU += totalCPU;
-                        jobRecord.LogicalDataBaseReads = logicalDBReads;
-                        jobRecord.LogicalDataBaseWrites = logicalDBWrites;
-                        jobRecord.PhysicalDataBaseReads += physicalDBReads;
-                        jobRecord.PhysicalDataBaseWrites += physicalDBWrites;
-                        jobRecord.TotalIFSBytesRead += totalIFSBytesRead;
-                        jobRecord.TotalIFSBytesWritten += totalIFSBytesWritten;
-
-
-                        // Report Progress
-                        RecordsProcessed++;
-                        if ((RecordsProcessed % 1000) == 0)
-                        {
-                            progress.Report(new DataImportProgress(startTime, RecordsProcessed, false));
-                        }
-
-                        // Check for Cancellation
-                        if (cancellationToken.IsCancellationRequested)
-                            break;
                     }
+                }
+                catch
+                {
+
                 }
             }
 
             connection.Close();
 
-            WriteJobRecordsToDatabase(true);
+            WriteJobRecordsToDatabase(sessionDatabase, true);
 
-            progress.Report(new DataImportProgress(toDate, RecordsProcessed, true));
+            OnImportComplete(progress, toDate, RecordsProcessed);
 
             return RecordsProcessed;
         }
 
-        private LansaJobRecord AddJobRecord(DateTime date, int hour)
+        private LansaJobRecord AddJobRecord(SQLiteConnection sessionDatabase, DateTime date, int hour)
         {
             if (_JobRecords.Count >= _MaxRecordCount)
-                WriteJobRecordsToDatabase(false);
+                WriteJobRecordsToDatabase(sessionDatabase, false);
 
             var record = new LansaJobRecord()
             {
@@ -142,7 +127,7 @@ namespace PrecedaSessionAnalyser.Import
         private SQLiteCommand _AddLANSAJobsSQL;
         private SQLiteCommand _UpdateLANSAJobsSQL;
         private SQLiteCommand _ReadLANSAJobsSQL;
-        private void WriteJobRecordsToDatabase(bool writeAll)
+        private void WriteJobRecordsToDatabase(SQLiteConnection sessionDatabase, bool writeAll)
         {
             IEnumerable<LansaJobRecord> recordsToWrite;
             if (writeAll)
@@ -153,18 +138,17 @@ namespace PrecedaSessionAnalyser.Import
 
             if (_AddLANSAJobsSQL == null)
             {
-                _AddLANSAJobsSQL = new SQLiteCommand("INSERT INTO LansaJobs(Date, Hour, Started, Active, StartedByWebServer, StartedByLANSA, TotalCPU, LogicalDataBaseReads, LogicalDataBaseWrites, PhysicalDataBaseReads, PhysicalDataBaseWrites, TotalIFSBytesRead, TotalIFSBytesWritten) VALUES(@Date, @Hour, @Started, @Active, @StartedByWebServer, @StartedByLANSA, @TotalCPU, @LogicalDataBaseReads, @LogicalDataBaseWrites, @PhysicalDataBaseReads, @PhysicalDataBaseWrites, @TotalIFSBytesRead, @TotalIFSBytesWritten)", _SqliteConnection);
+                _AddLANSAJobsSQL = new SQLiteCommand("INSERT INTO LansaJobs(Date, Hour, Started, Active, StartedByWebServer, StartedByLANSA, TotalCPU, LogicalDataBaseReads, LogicalDataBaseWrites, PhysicalDataBaseReads, PhysicalDataBaseWrites, TotalIFSBytesRead, TotalIFSBytesWritten) VALUES(@Date, @Hour, @Started, @Active, @StartedByWebServer, @StartedByLANSA, @TotalCPU, @LogicalDataBaseReads, @LogicalDataBaseWrites, @PhysicalDataBaseReads, @PhysicalDataBaseWrites, @TotalIFSBytesRead, @TotalIFSBytesWritten)", sessionDatabase);
                 _AddLANSAJobsSQL.Prepare();
 
-                _UpdateLANSAJobsSQL = new SQLiteCommand("UPDATE LansaJobs SET Started = @Started, Active = @Active, StartedByWebServer = @StartedByWebServer, StartedByLANSA = @StartedByLANSA, TotalCPU = @TotalCPU, LogicalDataBaseReads = @LogicalDataBaseReads, LogicalDataBaseWrites = @LogicalDataBaseWrites, PhysicalDataBaseReads = @PhysicalDataBaseReads, PhysicalDataBaseWrites = @PhysicalDataBaseWrites, TotalIFSBytesRead = @TotalIFSBytesRead, TotalIFSBytesWritten = @TotalIFSBytesWritten WHERE Date = @Date AND Hour = @Hour", _SqliteConnection);
+                _UpdateLANSAJobsSQL = new SQLiteCommand("UPDATE LansaJobs SET Started = @Started, Active = @Active, StartedByWebServer = @StartedByWebServer, StartedByLANSA = @StartedByLANSA, TotalCPU = @TotalCPU, LogicalDataBaseReads = @LogicalDataBaseReads, LogicalDataBaseWrites = @LogicalDataBaseWrites, PhysicalDataBaseReads = @PhysicalDataBaseReads, PhysicalDataBaseWrites = @PhysicalDataBaseWrites, TotalIFSBytesRead = @TotalIFSBytesRead, TotalIFSBytesWritten = @TotalIFSBytesWritten WHERE Date = @Date AND Hour = @Hour", sessionDatabase);
                 _UpdateLANSAJobsSQL.Prepare();
 
-                _ReadLANSAJobsSQL = new SQLiteCommand("SELECT Started, Active, StartedByWebServer, StartedByLANSA, TotalCPU, LogicalDataBaseReads, LogicalDataBaseWrites, PhysicalDataBaseReads, PhysicalDataBaseWrites, TotalIFSBytesRead, TotalIFSBytesWritten From LansaJobs WHERE Date = @Date AND Hour = @Hour", _SqliteConnection);
+                _ReadLANSAJobsSQL = new SQLiteCommand("SELECT Started, Active, StartedByWebServer, StartedByLANSA, TotalCPU, LogicalDataBaseReads, LogicalDataBaseWrites, PhysicalDataBaseReads, PhysicalDataBaseWrites, TotalIFSBytesRead, TotalIFSBytesWritten From LansaJobs WHERE Date = @Date AND Hour = @Hour", sessionDatabase);
                 _ReadLANSAJobsSQL.Prepare();
             }
 
 
-            var transaction = _SqliteConnection.BeginTransaction();
             foreach (var record in recordsToWrite)
             {
                 _ReadLANSAJobsSQL.Parameters.AddWithValue("@Date", record.Date.ToString("yyy-MM-dd"));
@@ -225,8 +209,6 @@ namespace PrecedaSessionAnalyser.Import
 
                 _JobRecords.Remove(record);
             }
-
-            transaction.Commit();
 
         }
 

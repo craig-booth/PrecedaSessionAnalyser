@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyser.Model
 {
-    class BrowserSummary : SummaryData<BrowserRecord>
+    public class BrowserSummary : SummaryData<BrowserRecord>
     {
         public HashSet<string> BrowserNames { get; } = new HashSet<string>();
 
@@ -36,8 +36,8 @@ namespace PrecedaSessionAnalyser
         }
     }
 
-    
-    class BrowserRecord : SummaryRecord
+
+    public class BrowserRecord : SummaryRecord
     {   
         public Dictionary<string, int> BrowserCount { get; } = new Dictionary<string, int>();
 

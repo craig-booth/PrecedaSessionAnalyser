@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PrecedaSessionAnalyser"
+        xmlns:model="clr-namespace:PrecedaSessionAnalyser.Model;assembly=PrecedaSessionAnalyser.Model"
         xmlns:chart="clr-namespace:PrecedaSessionAnalyser.Charts"
         xmlns:lvcharts="clr-namespace:LiveCharts.Wpf;assembly=LiveCharts.Wpf"
         mc:Ignorable="d"
@@ -61,7 +62,7 @@
             
         </DataTemplate>
 
-        <DataTemplate DataType="{x:Type local:CustomerRecord}">
+        <DataTemplate DataType="{x:Type model:CustomerRecord}">
 
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -87,7 +88,6 @@
                 <ComboBox ItemsSource="{Binding Charts}" DisplayMemberPath="Description" SelectedItem="{Binding SelectedChart}" DockPanel.Dock="Left" Margin="10,0" Width="150" Height="25"  />
                 <DatePicker SelectedDate="{Binding StartDate}" DockPanel.Dock="Left" Margin="10,0" Height="25"  />
                 <DatePicker SelectedDate="{Binding EndDate}" DockPanel.Dock="Left" Margin="10,0" Height="25"  />
-                <Button Content="Import Data" DockPanel.Dock="Right" Width="94" Margin="20,0" Height="25" Click="Button_Click_1"/>
             </DockPanel>
 
             <ContentControl Content="{Binding SelectedChart}" />

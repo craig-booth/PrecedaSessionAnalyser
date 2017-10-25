@@ -4,21 +4,21 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using System.Globalization;
 
+using System.Data;
 using System.Data.SQLite;
 
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyser.Model
 {
-    class SessionAnalyser
+    public class SessionAnalyser
     {
         public string DatabasePath { get; private set; }
 
         public SessionAnalyser(string databasePath)
         {
             DatabasePath = databasePath;
-
-            CreateDatabase();          
+               
+            CreateDatabase();      
         }
 
         private void CreateDatabase()
@@ -26,8 +26,12 @@ namespace PrecedaSessionAnalyser
             var connection = new SQLiteConnection("Data Source=" + DatabasePath + ";Version=3;");
             connection.Open();
 
-            var sql = "CREATE TABLE IF NOT EXISTS Sessions (Date CHAR(10) NOT NULL, Hour INT NOT NULL, Product INT NOT NULL, LogonCount INT NOT NULL, ActiveCount INT NOT NULL, PRIMARY KEY(Date, Hour, Product))";
+            var sql = "CREATE TABLE IF NOT EXISTS Config (Id INT NOT NULL, Server CHAR(50) NOT NULL, User CHAR(10) NOT NULL, Password CHAR(100) NOT NULL, Library CHAR(10) NOT NULL, LastImport CHAR(10) NOT NULL, PRIMARY KEY(Id))";
             var command = new SQLiteCommand(sql, connection);
+            command.ExecuteNonQuery();
+
+            sql = "CREATE TABLE IF NOT EXISTS Sessions (Date CHAR(10) NOT NULL, Hour INT NOT NULL, Product INT NOT NULL, LogonCount INT NOT NULL, ActiveCount INT NOT NULL, PRIMARY KEY(Date, Hour, Product))";
+            command = new SQLiteCommand(sql, connection);
             command.ExecuteNonQuery();
 
             sql = "CREATE TABLE IF NOT EXISTS Browsers (Date CHAR(10) NOT NULL, Browser CHAR(20) NOT NULL, Device CHAR(20) NOT NULL, Count INT NOT NULL, PRIMARY KEY(Date, Browser, Device))";
@@ -389,6 +393,7 @@ namespace PrecedaSessionAnalyser
             return (DateTime.Parse(date));
         }
     }
+
 
 
 

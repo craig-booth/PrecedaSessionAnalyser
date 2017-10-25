@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PrecedaSessionAnalyser
+namespace PrecedaSessionAnalyser.Model
 {
-    class Top5CustomerSummary
+    public class Top5CustomerSummary
     {
         public List<CustomerRecord> TotalLogons = new List<CustomerRecord>();
         public List<CustomerRecord> SingleSignOnLogons = new List<CustomerRecord>();
@@ -16,7 +16,7 @@ namespace PrecedaSessionAnalyser
         public List<CustomerRecord> IELogons = new List<CustomerRecord>();
     }
 
-    class CustomerRecord
+    public class CustomerRecord
     {
         public string Customer { get; set; }
         public int Count { get; set; }
