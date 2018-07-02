@@ -47,7 +47,7 @@ namespace PrecedaSessionAnalyser.Model.Import
                 var sessionStart = DBToDateTime(reader.GetString(1));
                 DateTime sessionEnd;
                 if (sessionActive)
-                    sessionEnd = new DateTime(9999, 12, 31);
+                    sessionEnd = toDate;
                 else
                     sessionEnd = DBToDateTime(reader.GetString(2));
                 var userType = reader.GetInt32(3);
